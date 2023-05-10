@@ -1,2 +1,2 @@
 # TRE-MPRA-Pipeline-data
-Test data for TRE-MPRA-Pipeline-
+Test data for TRE-MPRA-Pipeline
