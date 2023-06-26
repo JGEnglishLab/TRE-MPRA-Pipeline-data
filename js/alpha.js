@@ -32,7 +32,7 @@ class Alpha{
 
         this.alphaSvg = this.alpha_div.append("svg")
         .attr('id', 'alpha_svg')
-        .attr('width', this.WIDTH + 150)
+        .attr('width', this.WIDTH + 250)
         .attr('height', this.HEIGHT)
 
         this.selected_data = null
@@ -169,7 +169,9 @@ class Alpha{
       });
 
 
-        d3.select("#searchBarStim").on("change", function(d) {
+        // d3.select("#searchBarStim").on("change", function(d) {
+        document.getElementById('searchBarStim').addEventListener('change', function(){
+
             var selectedOption = d3.select(this).property("value")
    
             if (!that.stims.includes(selectedOption)){
@@ -188,8 +190,9 @@ class Alpha{
 
         })
 
-        d3.select("#searchBarBase").on("change", function(d) {
-            
+        // d3.select("#searchBarBase").on("change", function(d) {
+        document.getElementById('searchBarBase').addEventListener('change', function(){
+
             var selectedOption = d3.select(this).property("value")
             if (!that.bases.includes(selectedOption)){
                 that.globalApplicationState.base = null
@@ -340,6 +343,7 @@ class Alpha{
             if (selected_motif != ""){
                 selected_data = selected_data.filter(function(d){return d.motif == selected_motif})
             }
+            console.log("selected_data yo", selected_data)
             
     
             let max_base =  d3.max(selected_data.map(d => +d[this.base_name]))
@@ -397,7 +401,7 @@ class Alpha{
                         if(+d[that.max_rank_name] <= 5 & d[that.max_rank_name]!= ""){
                             return that.globalApplicationState.scaleColor(+d[that.max_rank_name])
                         }
-                        return "black"
+                        return this.CIRCLE_COLOR
                     }
                 })
                 .style('stroke', 'black')

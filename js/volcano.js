@@ -302,7 +302,7 @@ class Volcano{
                         if(+d[this.max_rank_name] <= 5 & d[this.max_rank_name]!= ""){
                             return that.globalApplicationState.scaleColor(+d[this.max_rank_name])
                         }
-                        return "black"
+                        return this.CIRCLE_COLOR
                     }
                 })
               
