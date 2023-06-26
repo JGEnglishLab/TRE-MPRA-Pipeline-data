@@ -1,97 +1,113 @@
 class Alpha{
-    constructor(alpha_data,volcano_data,globalApplicationState,volcano){
+    constructor(all_data,globalApplicationState,volcano){
 
         //**********************************************************************************************
-        //                                  CONSTANTS FOR CHART SIZE
+        //                                      CONSTANTS 
         //**********************************************************************************************
-        this.WIDTH = 500
+        this.WIDTH = 500 //550
         this.HEIGHT = 500
-        this.MARGIN = 5
-        this.HEADER_AXIS_HEIGHT = 30
-        this.SMALL_VIZ_HEIGHT = 30
-        this.SMALL_VIZ_WIDTH = 150
-        this.MARGIN_BOTTOM = 25
-        this.MARGIN_LEFT = 25
-        this.MARGIN_RIGHT = 25
-        this.MARGIN_TOP = 25
-        
+        this.MARGIN = 50
+        this.DEFAULT_STROKE_WIDTH = .5
+        this.TOP_5_OPACITY = 1
+        this.CONTROL_OPACITY = .1
+        this.ALL_OTHER_OPACITY=.5
+        this.BRUSH_ON_OPACITY=1
+        this.BRUSH_OFF_OPACITY=.1
+        this.TOP_5_RADIUS = 4
+        this.ALL_OTHER_RADIUS = 2.5
+
+
+        this.CIRCLE_COLOR = "grey"
+        this.CONTROL_CIRCLE_COLOR = "#4c4c4c"
+
         //**********************************************************************************************
         //                                  GENERAL SET UP 
         //**********************************************************************************************
         this.globalApplicationState = globalApplicationState
-    
-        this.alpha_data = alpha_data
-        this.volcano_data = volcano_data
-        this.volcano = volcano
-
-        this.groupedData = d3.groups(alpha_data, (d) => d.name)
         
-        this.treatments = this.groupedData.map((d,i) => {
-            return {name: d[0], position: i}})
+        this.all_data = all_data
 
+        this.volcano = volcano
         this.alpha_div = d3.select("#alpha-div") 
 
         this.alphaSvg = this.alpha_div.append("svg")
         .attr('id', 'alpha_svg')
-        .attr('width', this.WIDTH)
+        .attr('width', this.WIDTH + 250)
         .attr('height', this.HEIGHT)
+
+        this.selected_data = null
+
+        this.alphaSvg.append("circle").attr("cx",510).attr("cy",130).attr("r", 6).attr("stroke", "black").style("fill", this.globalApplicationState.scaleColor(1))
+        this.alphaSvg.append("circle").attr("cx",510).attr("cy",160).attr("r", 6).attr("stroke", "black").style("fill", this.globalApplicationState.scaleColor(2))
+        this.alphaSvg.append("circle").attr("cx",510).attr("cy",190).attr("r", 6).attr("stroke", "black").style("fill", this.globalApplicationState.scaleColor(3))
+        this.alphaSvg.append("circle").attr("cx",510).attr("cy",220).attr("r", 6).attr("stroke", "black").style("fill", this.globalApplicationState.scaleColor(4))
+        this.alphaSvg.append("circle").attr("cx",510).attr("cy",250).attr("r", 6).attr("stroke", "black").style("fill", this.globalApplicationState.scaleColor(5))
+
+        this.alphaSvg.append("text").attr("x",490).attr("y",90).text("Motif's with highest").style("font-size", "17px").attr("alignment-baseline","middle")
+        this.alphaSvg.append("text").attr("x",490).attr("y",110).text("absolute Log2 FC").style("font-size", "17px").attr("alignment-baseline","middle")
+
+        this.alphaSvg.append("text").attr("x",530).attr("y",130).text("1").style("font-size", "15px").attr("alignment-baseline","middle")
+        this.alphaSvg.append("text").attr("x",530).attr("y",160).text("2").style("font-size", "15px").attr("alignment-baseline","middle")
+        this.alphaSvg.append("text").attr("x",530).attr("y",190).text("3").style("font-size", "15px").attr("alignment-baseline","middle")
+        this.alphaSvg.append("text").attr("x",530).attr("y",220).text("4").style("font-size", "15px").attr("alignment-baseline","middle")
+        this.alphaSvg.append("text").attr("x",530).attr("y",250).text("5").style("font-size", "15px").attr("alignment-baseline","middle")
+
+
+        this.searchBarStim = document.getElementById("searchBarStim");
+        this.datalistStim = document.createElement("datalist");
+        this.datalistStim.id = "searchOptionsStim";
+
+        this.searchBarBase = document.getElementById("searchBarBase");
+        this.datalistBase = document.createElement("datalist");
+        this.datalistBase.id = "searchOptionsBase";
 
 
         //**********************************************************************************************
         //                                 SELECTORS
         //**********************************************************************************************
 
+      
 
-        //*************************************** 
-        // Add "(select option)"
-        //***************************************
-
-        d3.select("#select-base")
-        .selectAll('myOptions')
-        .data(["(Select treatment)"])
-        .enter()
-        .append('option')
-        .text(function (d) { return d; }) 
-        .attr("value", function (d) { return d; }) 
-        // Stimulated
-        d3.select("#select-stimulated")
-        .selectAll('myOptions')
-        .data(["(Select treatment)"])
-        .enter()
-        .append('option')
-        .text(function (d) { return d; }) 
-        .attr("value", function (d) { return d; }) 
-
-
-        //*************************************** 
-        // Add all other 
-        //***************************************
 
         //For getting unique values for base a stimulated
         function onlyUnique(value, index, self) {
             return self.indexOf(value) === index;
         }
-          
-        this.bases = this.volcano_data.map(d => d.basal).filter(onlyUnique)
-        this.stims = this.volcano_data.map(d => d.stimulated).filter(onlyUnique)
+        
+        this.baseMap = new Map();
+        this.stimMap = new Map();
 
-        // Select Base
-        d3.select("#select-base")
-            .selectAll('myOptions')
-            .data(this.bases)
-            .enter()
-            .append('option')
-            .text(function (d) { return d; }) 
-            .attr("value", function (d) { return d; }) 
+        this.bases = []
+        this.stims = []
+        let counter = 0 
 
-        // Select Stimulated
-        d3.select("#select-stimulated")
-            .selectAll('myOptions')
-            .data(this.stims)
-            .enter()
-            .append('option')
-            .text(function (d) { return d; }) 
-            .attr("value", function (d) { return d; }) 
+        for (let i = 0; i < this.globalApplicationState.base_treatments.length; i++) {
+            counter = counter + 1
+            let curBase = this.globalApplicationState.base_treatments[i] + "\t(" + this.globalApplicationState.base_runs[i] + ")"
+            let curStim = this.globalApplicationState.stim_treatments[i] + "\t(" + this.globalApplicationState.stim_runs[i] + ")"
+            this.stims.push(curStim)
+            this.bases.push(curBase)
+
+            // If its already in map just push it
+            if (this.baseMap.get(curBase) != undefined){
+                this.baseMap.get(curBase).push(curStim)
+            }else{
+                this.baseMap.set(curBase, [curStim])
+            }
+
+            if (this.stimMap.get(curStim) != undefined){
+                this.stimMap.get(curStim).push(curBase)
+            }else{
+                this.stimMap.set(curStim, [curBase])
+            }
+        }
+
+
+        this.bases = this.bases.filter(onlyUnique)
+        this.stims = this.stims.filter(onlyUnique)
+
+        this.updateSearchOptions(this.bases, "base")
+        this.updateSearchOptions(this.stims, "stim")
 
         
         //*************************************** 
@@ -99,35 +115,102 @@ class Alpha{
         //***************************************
 
         const that = this
+          
 
-        d3.select("#select-stimulated").on("change", function(d) {
+        document.getElementById('control_check').addEventListener('change', function(){
+
+        const isChecked = d3.select(this).property("checked");
+        if (isChecked) {
+            d3.select("#top_check").property('checked', false)
+            that.drawAlphaScatter()
+            that.points.selectAll("circle")
+                .style("opacity", d => (d.controls === "True" ? 1 : 0))
+                .filter(d => d.controls !== "True")
+                .remove();
+        } 
+        else {
+            that.drawAlphaScatter()
+        }
+      });
+
+
+
+      document.getElementById('number_selector').addEventListener('change', function(){
+        let n = d3.select('#number_selector').property("value") === "" ? 5 : d3.select('#number_selector').property("value")
+        const isChecked = d3.select("#top_check").property("checked");
+        if (isChecked) {
+            d3.select("#control_check").property('checked', false)
+            that.drawAlphaScatter()
+            that.points.selectAll("circle")
+                // .style("opacity", d => (+d[that.max_rank_name] <= 5) )
+                .filter(d => +d[that.max_rank_name] > n | d[that.max_rank_name] == "")
+                .remove();
+        } 
+        else {
+            that.drawAlphaScatter()
+        }
+      });
+
+
+      document.getElementById('top_check').addEventListener('change', function(){
+        let n = d3.select('#number_selector').property("value") === "" ? 5 : d3.select('#number_selector').property("value")
+        const isChecked = d3.select(this).property("checked");
+        if (isChecked) {
+            d3.select("#control_check").property('checked', false)
+            that.drawAlphaScatter()
+            that.points.selectAll("circle")
+                // .style("opacity", d => (+d[that.max_rank_name] <= 5) )
+                .filter(d => +d[that.max_rank_name] > n | d[that.max_rank_name] == "")
+                .remove();
+        } 
+        else {
+            that.drawAlphaScatter()
+        }
+      });
+
+
+        // d3.select("#searchBarStim").on("change", function(d) {
+        document.getElementById('searchBarStim').addEventListener('change', function(){
+
             var selectedOption = d3.select(this).property("value")
-            if (selectedOption === "(Select treatment)"){
+   
+            if (!that.stims.includes(selectedOption)){
                 that.globalApplicationState.stimulated = null
             }
             else{
                 that.globalApplicationState.stimulated = selectedOption
             }
-            that.updateOptions(selectedOption, "stimulated")
             that.drawAlphaScatter()
             that.volcano.drawVolcano()
+            that.filter_options(that.globalApplicationState.stimulated, "stim")
+            that.info.updateSearchOptions()
+            d3.select("#control_check").property('checked', false)
+            d3.select("#top_check").property('checked', false)
+
+
         })
 
-        d3.select("#select-base").on("change", function(d) {
-            
+        // d3.select("#searchBarBase").on("change", function(d) {
+        document.getElementById('searchBarBase').addEventListener('change', function(){
+
             var selectedOption = d3.select(this).property("value")
-            console.log("HERE", selectedOption)
-            if (selectedOption === "(Select treatment)"){
+            if (!that.bases.includes(selectedOption)){
                 that.globalApplicationState.base = null
             }
             else{
                 that.globalApplicationState.base = selectedOption
             }
-            that.updateOptions(selectedOption, "base")
             that.drawAlphaScatter()
             that.volcano.drawVolcano()
+            that.filter_options(that.globalApplicationState.base, "base")
+            that.info.updateSearchOptions()
+            d3.select("#control_check").property('checked', false)
+            d3.select("#top_check").property('checked', false)
+
+
         })
 
+       
         //**********************************************************************************************
         //                                      INITIAL SCATTER
         //**********************************************************************************************
@@ -137,775 +220,274 @@ class Alpha{
         //***************************************
 
         this.min =  0
-        this.max =  d3.max(this.alpha_data.map(d => d.value))
+        this.max =  5
 
         this.x_scale = d3.scaleLinear()
         .domain([this.min, this.max]).nice()
-        .range([this.MARGIN_LEFT, this.WIDTH - this.MARGIN_RIGHT])
-
+        .range([this.MARGIN, this.WIDTH - this.MARGIN])
         this.y_scale = d3.scaleLinear()
         .domain([this.min, this.max]).nice()
-        .range([this.HEIGHT - this.MARGIN_BOTTOM, this.MARGIN_TOP])
+        .range([this.HEIGHT - this.MARGIN, this.MARGIN])
 
         this.xAxis = g => g
-        .attr("transform", `translate(0,${this.HEIGHT - this.MARGIN_BOTTOM })`)
+        .attr("transform", `translate(0,${this.HEIGHT- this.MARGIN })`)
         .call(d3.axisBottom(this.x_scale))
-
         this.yAxis = g => g
-        .attr("transform", `translate(${this.MARGIN_LEFT},0)`)
+        .attr("transform", `translate(${this.MARGIN },0)`)
         .call(d3.axisLeft(this.y_scale))
-
 
         this.x_axis = this.alphaSvg.append('g').call(this.xAxis)
         this.y_axis = this.alphaSvg.append('g').call(this.yAxis)
+
+
+        this.alphaSvg
+        .append("text")
+        .attr("id", "base_text")
+        .attr("transform","translate(" + this.WIDTH / 2 + " ," + (this.HEIGHT - 10) + ")")
+        .style("text-anchor", "middle")
+        .text("Basal Alpha");
+
+        this.alphaSvg
+        .append("text")
+        .attr("id", "stim_text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 15)
+        .attr("x",-(this.HEIGHT/2))
+        .style("text-anchor", "middle")
+        .text("Stimulated Alpha");
+
         this.points = this.alphaSvg.append('g')
-
-        this.alphaSvg.append('g')
-        .attr('id','brush-layer')
-        .call(d3.brush().on("start brush end", brushed))
-
-        function brushed({selection}){
-            if(selection){
-                const [[x0, y0], [x1, y1]] = selection;
-                let brushed_data = that.points.selectAll('circle').filter(d => 
-                    x0 <= that.x_scale(d.base_value) 
-                    && that.x_scale(d.base_value) < x1 
-                    && y0 <= that.y_scale(d.stim_value) 
-                    && that.y_scale(d.stim_value) < y1)
-                .data()
-                .map(d => d.architecture)
-
-                that.volcano.brushVolcano(brushed_data, true)
-
-              
-                
-                that.points.selectAll('circle')
-                .style('fill', d => {
-                    if ( x0 <= that.x_scale(d.base_value) 
-                    && that.x_scale(d.base_value) < x1 
-                    && y0 <= that.y_scale(d.stim_value) 
-                    && that.y_scale(d.stim_value) < y1){
-                        return("red")
-                    }
-                    else{
-                        return('grey')
-                    }
-                })
-              
-            }
-            else{
-                that.volcano.brushVolcano(null, false)
-
-                that.points.selectAll('circle')
-                .style('fill','grey')
-            }
-            
-        }
-
-
-
-
-     
-
-
-
-  
-        
-
-    //     this.max_x_freq = d3.max(this.data.map(d => d.total).map(Number)) / 50
-    //     this.scale_freq = d3.scaleLinear()
-    //     .domain([0, this.max_x_freq])
-    //     .range([0, this.SMALL_VIZ_WIDTH]);
-
-    //     this.scale_percent = d3.scaleLinear()
-    //     .domain([-105, 105])
-    //     .range([0, this.SMALL_VIZ_WIDTH]);
-
-       
-    //     this.scaleColor = d3.scaleOrdinal() 
-    //     .domain([this.keys.map(d => d.category)])
-    //     .range(["#11C67A", "#FFC60D" , "#076CFD", "#FDB9CB", "#F87D1F", "#EA3636"]);
-
-    //     this.headerData = [
-    //         {
-    //             sorted: false,
-    //             ascending: false,
-    //             key: 'phrase'
-    //         },
-    //         {
-    //             sorted: false,
-    //             ascending: false,
-    //             key: 'frequency'
-    //         },
-    //         {
-    //             sorted: false,
-    //             ascending: false,
-    //             key: 'percentage'
-    //         },
-    //         {
-    //             sorted: false,
-    //             ascending: false,
-    //             key: 'total'
-    //         }
-    //     ]
-  
-    //     //**********************************************************************************************
-    //     //                                  MAKE HEADERS
-    //     //**********************************************************************************************
-    //     let thead = this.table.append("thead")
-        
-        
-    //     // let table = document.getElementById("the_table");
-
-    //     // let header = table.createTHead()
-    //     // header.id = "header"
-    //     let header_row = thead.append('tr').attr('id', 'column_headers')
-    //     // let row2 = header.insertRow(1); 
-
-    //     // row.id = "header_row"
-      
-    //     let headerNames = ["Phrase", "Frequency", "Percentages", "Total"]
-
-    //     for (let i = 0; i < headerNames.length; i++) {
-    //         let cur_header = header_row.append('th')
-    //         .text(headerNames[i])
-    //         .style('text-align', 'left')
-    //         .style('background', 'Gainsboro')
-    //         .attr('class', 'sortable')
-    //     }
-
-    //     //Should I put my content row in the header or tbody?
-    //     this.content_row = thead.append('tr')
-
-    //     let col_type1 = this.content_row.append('td')
-    //     let col_type2 = this.content_row.append('td')
-    //     let col_type3 = this.content_row.append('td')
-    //     let col_type4 = this.content_row.append('td')
-
-        
-    //     col_type2.append('svg')
-    //     .attr('id', 'freq_axis')
-    //     .style('height', this.HEADER_AXIS_HEIGHT)
-    //     .style('width', this.SMALL_VIZ_WIDTH + this.MARGIN)
-    //     // .style('padding', '5px')
-
-    //     col_type3.append('svg')
-    //     .attr('id', 'percent_axis')
-    //     .style('height', this.HEADER_AXIS_HEIGHT)
-    //     .style('width', this.SMALL_VIZ_WIDTH + this.MARGIN)
-    //     // .style('margin', '5px')
-
-    //     // //**********************************************************************************************
-    //     // //                                  SET LEGEND FREQUENCY
-    //     // //**********************************************************************************************
-
-    //     // let legend_data = ['0', '0.5', '1']
-    //     // let xAxisGenerator = d3.axisBottom(this.scale_freq);
-
-    //     // xAxisGenerator.ticks(3);
-    //     // xAxisGenerator.tickValues([0, .5, 1])
-    //     // xAxisGenerator.tickSize()
-
-    //     // let xAxis =  d3.select('#freq_axis')
-    //     //       .call(xAxisGenerator)
-    //     //       .selectAll("text")
-    //     //       .text((d)=>d)
-    //     //       .attr("color", 'grey')
-           
-    //     //     xAxis
-    //     //     .data(legend_data)
-    //     //     .text((d)=>d)
-    //     //     .style("font", "12px sans-serif")
-
-    //     //     d3.select('.domain').remove()
-
-    //     //     d3.select("#freq_axis")
-    //     //     .attr('height', this.headHeight)
-
-
-    //     // //**********************************************************************************************
-    //     // //                                  SET LEGEND PERCENTAGE
-    //     // //**********************************************************************************************
-
-    //     // let legend_data_per = ['100', '50', '0', '50', '100']
-    //     // let xAxisGenerator_per = d3.axisBottom(this.scale_percent);
-
-    //     // xAxisGenerator_per.ticks(5);
-    //     // xAxisGenerator_per.tickValues([-100, -50, 0, 50, 100])
-    //     // xAxisGenerator_per.tickSize()
-
-    //     // let xAxis_per =  d3.select('#percent_axis')
-    //     //       .call(xAxisGenerator)
-    //     //       .selectAll("text")
-    //     //       .text((d)=>d)
-    //     //       .attr("color", 'grey')
-           
-    //     //     xAxis_per
-    //     //     .data(legend_data_per)
-    //     //     .text((d)=>d)
-    //     //     .style("font", "12px sans-serif")
-
-    //     //     d3.select('.domain').remove()
-
-    //     //     d3.select("#percent_axis")
-    //     //     .attr('height', this.headHeight)
-
-
-
-
-    //     //**********************************************************************************************
-    //     //                                  MAKE BODY
-    //     //**********************************************************************************************
-
-    //     this.tbody = this.table.append('tbody').attr('id', 'table_body')
-
-    //     this.attachSortHandlers();
-        
-    // }
-
-    
-
-    // drawTable() {
-    //     let tableData = this.data
-
-    //     if (this.globalApplicationState.brushed){
-    //         tableData = this.globalApplicationState.brushed_data
-    //     }
-
-        
-    //     let rowSelection = d3.select('#table_body')
-    //         .selectAll('tr')
-    //         .data(tableData)
-    //         .join('tr');
-
-        
-    //     let forecastSelection = rowSelection.selectAll('td')
-    //         .data(this.rowToCellDataTransform)
-    //         .join('td')
-    //         .attr('class', d => d.class);
-
-
-         
-    
-    //     //Add Text
-    //     let textSelection = forecastSelection.filter(d => d.type === 'text')
-    //         .text(d => d.value)
-
-
-    //     //Add frequencies
-    //     let vizSelection_freq = forecastSelection.filter(d => d.type === 'freq_viz');
-    //     let svgSelect_freq = vizSelection_freq.selectAll('svg')
-    //         .data(d => [d])
-    //         .join('svg')
-    //         .attr('width', this.SMALL_VIZ_WIDTH)
-    //         .attr('height', this.SMALL_VIZ_HEIGHT);
-    //     let grouperSelect_freq = svgSelect_freq.selectAll('g')
-    //         .data(d => [d, d])  //Maybe keep second d if you want to add grid lines
-    //         .join('g');
-    //     this.addFrequencyRectangles(grouperSelect_freq.filter((d,i) => i === 1));
-
-
-    //     //Add Percents
-    //     let vizSelection_per = forecastSelection.filter(d => d.type === 'percent_viz');
-    //     let svgSelect_per = vizSelection_per.selectAll('svg')
-    //         .data(d => [d])
-    //         .join('svg')
-    //         .attr('width', this.SMALL_VIZ_WIDTH)
-    //         .attr('height', this.SMALL_VIZ_HEIGHT);
-    //     let grouperSelect_per = svgSelect_per.selectAll('g')
-    //         .data(d => [d, d])  //Maybe keep second d if you want to add grid lines
-    //         .join('g');
-    //     // this.addGridlines(grouperSelect.filter((d,i) => i === 0), [-75, -50, -25, 0, 25, 50, 75]);
-    //     this.addPercentRectangles(grouperSelect_per.filter((d,i) => i === 1));
-
-    //     this.drawHeaders()
-
-
 
     }
 
-    drawAlphaScatter(){
+
+    updateSearchOptions(options, selector) {
+        const that = this
+
+        if (selector === "stim"){
+            // Clear existing options
+            while (this.datalistStim.firstChild) {
+                this.datalistStim.removeChild(this.datalistStim.firstChild);
+            }
+        
+            // Add new options
+            options.forEach(function(option) {
+                const optionElement = document.createElement("option");            
+                optionElement.value = option;
+                that.datalistStim.appendChild(optionElement);
+            });
+            this.searchBarStim.appendChild(this.datalistStim);  
+        }
+
+        else if (selector === "base"){
+            while (this.datalistBase.firstChild) {
+                this.datalistBase.removeChild(this.datalistBase.firstChild);
+            }
+        
+            // Add new options
+            options.forEach(function(option) {
+                const optionElement = document.createElement("option");            
+                optionElement.value = option;
+                that.datalistBase.appendChild(optionElement);
+            });
+            this.searchBarBase.appendChild(this.datalistBase);  
+        }
+    
+        
+
+        
+    
+    }
+    
+    drawAlphaScatter(selected_motif = ""){
 
         if (this.globalApplicationState.base != null && this.globalApplicationState.stimulated != null){
-            let base_data  = this.alpha_data.filter(d => d.name == this.globalApplicationState.base)
-            let stim_data = this.alpha_data.filter(d => d.name == this.globalApplicationState.stimulated)
-            
-            let joined_data = []
-            for(let i = 0; i < base_data.length; i++){
 
 
-                let base_row_value = base_data[i].value
-                let stim_row_value = stim_data.filter(d=> d.architecture == base_data[i].architecture)[0].value
+            //Remove everything before drawing again
+            this.points
+                .selectAll('circle')
+                .remove()
 
-                let cur_row = {
-                    architecture: base_data[i].architecture,
-                    base_value: base_row_value,
-                    stim_value: stim_row_value
-                }
-                joined_data.push(cur_row)
+            let base_run = this.globalApplicationState.base.split("\t(")[1].replace(")", "")
+            let base_treatment = this.globalApplicationState.base.split("\t(")[0]
+
+            let stim_run = this.globalApplicationState.stimulated.split("\t(")[1].replace(")", "")
+            let stim_treatment = this.globalApplicationState.stimulated.split("\t(")[0]
+
+            this.stim_name = "alpha__"+stim_treatment+"__"+stim_run
+            this.base_name = "alpha__"+base_treatment+"__"+base_run
+            this.max_rank_name = "maxRank__" +base_treatment+"__"+base_run+"_vs_"+stim_treatment+"__"+stim_run
+            let max_name = "max__" +base_treatment+"__"+base_run+"_vs_"+stim_treatment+"__"+stim_run
+            let logFC_col = "logFC__"+this.globalApplicationState.selected_comparison
+            let pval_col = "statistic__"+this.globalApplicationState.selected_comparison
+
+
+            d3.select("#base_text").text("Basal Alpha "+base_treatment + " ("+ base_run +")")
+            d3.select("#stim_text").text("Stimulated Alpha "+stim_treatment + " ("+ stim_run +")")
+
+            this.globalApplicationState.selected_comparison = base_treatment+"__"+base_run+"_vs_"+stim_treatment+"__"+stim_run
+
+            const that = this
+            let selected_data = this.all_data.filter(function(d){return d[that.base_name]!= "";})
+            selected_data = selected_data.filter(function(d){return d[that.stim_name] != "";})
+            selected_data = selected_data.filter(function(d){return d[that.max_rank_name] != "";})
+
+        
+            //Filter the same way we filter volcano data so all points are in each 
+            selected_data = selected_data.filter(function(d){return d[pval_col]!= "";})
+            selected_data = selected_data.filter(function(d){return d[logFC_col] != "";})
+
+            this.globalApplicationState.motifs = [...new Set(selected_data.map((item) => item.motif))];
+
+            if (selected_motif != ""){
+                selected_data = selected_data.filter(function(d){return d.motif == selected_motif})
             }
+            console.log("selected_data yo", selected_data)
+            
+    
+            let max_base =  d3.max(selected_data.map(d => +d[this.base_name]))
+            let max_stim =  d3.max(selected_data.map(d => +d[this.stim_name]))
 
-
-            joined_data = joined_data.filter(d => d.base_value != null && d.stim_value != null)
-
-            //TODO more efficient way to do this?
-            let max_base =  d3.max(joined_data.map(d => d.base_value))
-            let max_stim =  d3.max(joined_data.map(d => d.stim_value))
-
-            let max = d3.max([max_base, max_stim])
-
+            let max = d3.max([max_base, max_stim])        
             this.x_scale = d3.scaleLinear()
             .domain([this.min, max]).nice()
-            .range([this.MARGIN_LEFT, this.WIDTH - this.MARGIN_RIGHT])
+            .range([this.MARGIN, this.WIDTH - this.MARGIN])
 
             this.y_scale = d3.scaleLinear()
             .domain([this.min, max]).nice()
-            .range([this.HEIGHT - this.MARGIN_BOTTOM, this.MARGIN_TOP])
+            .range([this.HEIGHT - this.MARGIN , this.MARGIN])
 
             this.x_axis.selectAll('g').remove()
             this.y_axis.selectAll('g').remove()
 
-
             this.x_axis = this.alphaSvg.append('g').call(this.xAxis)
             this.y_axis = this.alphaSvg.append('g').call(this.yAxis)
 
-  
+
             this.points
                 .selectAll('circle')
-                .data(joined_data)
+                .data(selected_data)
                 .enter()
                 .append('circle')
-                .attr('cx', (d)=> this.x_scale(d.base_value))
-                .attr('cy', (d)=> this.y_scale(d.stim_value))
-                .attr('r', 2)
-                .style('fill', 'grey')
+                .attr('cx', (d)=> this.x_scale(d[this.base_name]))
+                .attr('cy', (d)=> this.y_scale(d[this.stim_name]))
+                .attr('r', (d) =>{
+                    if (selected_motif==""){
+                        if (+d[that.max_rank_name] <= 5){
+                            return(this.TOP_5_RADIUS)
+                        }
+                        else{
+                            return(this.ALL_OTHER_RADIUS )
+                        }
+                    }
+                    else{
+                        return(this.TOP_5_RADIUS)
+                    }
+                })
+                .style('fill', (d)=>{
+                    if (selected_motif==""){
+                        if(+d[that.max_rank_name] <= 5 & d[that.max_rank_name]!= ""){
+                            return that.globalApplicationState.scaleColor(+d[that.max_rank_name])
+                        }
+                        else if (d["controls"] === "True"){
+                            return this.CONTROL_CIRCLE_COLOR
+                        }
+                        else{
+                            return this.CIRCLE_COLOR
+                        }
+                    }
+                    else{
+                        if(+d[that.max_rank_name] <= 5 & d[that.max_rank_name]!= ""){
+                            return that.globalApplicationState.scaleColor(+d[that.max_rank_name])
+                        }
+                        return this.CIRCLE_COLOR
+                    }
+                })
                 .style('stroke', 'black')
-                .style('stroke-width', .2)
-                .style('opacity', .5)
+                .style('stroke-width', this.DEFAULT_STROKE_WIDTH)
+                .style('opacity', (d)=>{
+                    if (selected_motif==""){
+                        if(+d[that.max_rank_name] <= 5 & d[that.max_rank_name]!= ""){
+                            return that.TOP_5_OPACITY
+                        }
+                        else if (d["controls"] === "True"){
+                            return that.CONTROL_OPACITY
+                        }
+                        else{
+                            return that.ALL_OTHER_OPACITY
+                        }
+                    }
+                    else{
+                        return that.TOP_5_OPACITY
+                    }
+                })
+                .on("mouseover", (event, d) => {
+                    d3.select(".tooltip")
+                      .style("opacity", 1)
+                      .html("Architecture Name: " + d.architecture)
+                      .style("left", `${event.pageX + 30}px`)
+                      .style("top", `${event.pageY - 10}px`)
+                  })
+                  .on("mousemove", (event, d) => {
+                    d3.select(".tooltip")
+                      .style("left", `${event.pageX + 30}px`)
+                      .style("top", `${event.pageY - 10}px`)
+                  })
+                  .on("mouseleave", (event, d) => {
+                    d3.select(".tooltip")
+                    .style("opacity", 0)
+                    .style("left", "-30px")
+                    .style("top", "-30px")
+                  })
+                  .on("click", (event, d) => {
+                    that.info.click(d)
+                  })
 
+
+        
+
+            
         }
 
         else{
+            this.globalApplicationState.selected_comparison = "none"
             this.points
                 .selectAll('circle')
                 .remove()
+            d3.select("#base_text").text("Basal Alpha")
+            d3.select("#stim_text").text("Stimulated Alpha")
+            this.info.clear()
         }
+
+
 
     }
 
-    updateOptions(option, selected_column){
-        let allTreatment =  this.treatments.map(d => d.name)
+    filter_options(option, selected_searchbar){
+        const that = this
 
-        if (selected_column == "base"){
-            console.log("ok")
+        // If they cleared a selection. Restore all options
+        if (option === null && selected_searchbar === "base"){
+            that.updateSearchOptions(that.stims, "stim")
         }
+        else if (option === null && selected_searchbar === "stim"){
+            that.updateSearchOptions(that.bases, "base")
+        }
+
+        else if (option != null && selected_searchbar === "stim"){
+            that.updateSearchOptions(that.stimMap.get(option), "base")
+        }
+        else if (option != null && selected_searchbar === "base"){
+            that.updateSearchOptions(that.baseMap.get(option), "stim")
+        }
+
+
+    }
+
+    set_info(info){
+        this.info = info
     }
        
-    // drawHeaders(){
-    //     //**********************************************************************************************
-    //     //                                  SET LEGEND FREQUENCY
-    //     //**********************************************************************************************
-
-    //     let legend_data = ['0', '0.5', '1']
-    //     let xAxisGenerator = d3.axisBottom(this.scale_freq);
-
-    //     xAxisGenerator.ticks(3);
-    //     xAxisGenerator.tickValues([0, .5, 1])
-    //     xAxisGenerator.tickSize()
-
-    //     let xAxis =  d3.select('#freq_axis')
-    //           .call(xAxisGenerator)
-    //           .selectAll("text")
-    //           .text((d)=>d)
-    //           .attr("color", 'grey')
-           
-    //         xAxis
-    //         .data(legend_data)
-    //         .text((d)=>d)
-    //         .style("font", "12px sans-serif")
-
-    //         d3.select('.domain').remove()
-
-    //         d3.select("#freq_axis")
-    //         .attr('height', this.headHeight)
-
-
-    //     //**********************************************************************************************
-    //     //                                  SET LEGEND PERCENTAGE
-    //     //**********************************************************************************************
-
-    //     let legend_data_per = ['100', '50', '0', '50', '100']
-    //     let xAxisGenerator_per = d3.axisBottom(this.scale_percent);
-
-    //     xAxisGenerator_per.ticks(5);
-    //     xAxisGenerator_per.tickValues([-100, -50, 0, 50, 100])
-    //     xAxisGenerator_per.tickSize()
-
-    //     let xAxis_per =  d3.select('#percent_axis')
-    //           .call(xAxisGenerator)
-    //           .selectAll("text")
-    //           .text((d)=>d)
-    //           .attr("color", 'grey')
-           
-    //         xAxis_per
-    //         .data(legend_data_per)
-    //         .text((d)=>d)
-    //         .style("font", "12px sans-serif")
-
-    //         d3.select('.domain').remove()
-
-    //         d3.select("#percent_axis")
-    //         .attr('height', this.headHeight)
-
-    // }
-
-
-
-
-    // //**********************************************************************************************
-    // //**********************************************************************************************
-    // //                                      addRectangles For frequency
-    // //**********************************************************************************************
-    // //**********************************************************************************************
-    // addFrequencyRectangles(containerSelect) {
-
-    //     let rect_group = containerSelect
-    //     .selectAll('rect')
-    //     .data((d) => [d])
-    //     .enter()
-    //     .append('g')
-
-    //     rect_group.append('rect')
-    //     .attr("height", 20)
-    //     .attr("y", 5)
-    //     .attr('x', this.scale_freq(0))
-    //     .attr('width', (d) => this.scale_freq(d.value.frequency))
-    //     .attr("fill",  (d) => this.scaleColor(d.value.category))
-    //     .attr('opacity', .75)
-    // }
-
-
-    // //**********************************************************************************************
-    // //**********************************************************************************************
-    // //                                      addRectangles For Percent
-    // //**********************************************************************************************
-    // //**********************************************************************************************
-
-    // addPercentRectangles(containerSelect) {
-
-        
- 
-
-    //     let rect_group = containerSelect
-    //     .selectAll('rect')
-    //     .data((d) => {return [d,d];})
-    //     .enter()
-    //     .append('g')
-
-    //     //add rect left of center
-    //     rect_group.append('rect')
-    //     .attr("height", 20)
-    //     .attr("y", 5)
-    //     .attr("x", (d) => {
-    
-    //         if (d.value.dem_percent > 0){ 
-    //             return(this.scale_percent(d.value.dem_percent * -1))
-    //         }
-    //         else {
-    //             return(0)
-    //         }
-    //     })
-    //     .attr("width", (d) => {
-    //         //If low and high are left of 0
-    //         if (d.value.dem_percent > 0){
-    //             return(this.scale_percent(d.value.dem_percent)- this.scale_percent(0))
-    //         }
-    //         else {
-    //             return(0)
-    //         }})
-    //     .attr("fill",  "steelblue")
-    //     .attr('opacity', .75)
-
-    //     //add rect right of center
-    //     rect_group.append('rect')
-    //     .attr("height", 20)
-    //     .attr("y", 5)
-    //     .attr("x", this.scale_percent(0))
-    //     .attr("width", (d) => {
-   
-    //         if (d.value.rep_percent > 0){
-    //             // return(5)
-    //             return(this.scale_percent(d.value.rep_percent) - this.scale_percent(0))
-    //         }
-    //         else {
-    //             return(0)
-    //         }})
-    //     .attr("fill",  "firebrick")
-    //     .attr('opacity', .75)
-
-    // }
-
-    // attachSortHandlers() {
-    //     ////////////
-    //     // PART 6 // 
-    //     ////////////
-
-
-
-    //     let c_header = this.table.select("#column_headers")
-    //     let headers = c_header.selectAll('th')
-
-    //     let sort_data = this.data
-    //     if (this.globalApplicationState.brushed){
-    //         sort_data = this.globalApplicationState.brushed_data
-    //     }
-    //     headers.on("click", (d) => {
-
-
-
-    //         //************************* 
-    //         //SORT PHRASE
-    //         //*************************
-    //         if (d.path[0].innerText.includes("Phrase")){
-                
-
-    //             if (!this.headerData[0].ascending){
-                
-    //                 sort_data.sort((a,b) => {
-    //                     return a.phrase < b.phrase ? -1 : 1
-    //                 });
-                    
-    //                 this.table.selectAll('g').remove()
-
-    //                 let rows = this.table.selectAll('td')
-    //                 let svg_rows = rows.selectAll('svg')
-    //                 let cur_row_g = svg_rows.selectAll('g')
-    //                 cur_row_g.remove()
-
-    //                 this.headerData[0].sorted = true
-    //                 this.headerData[1].sorted = false
-    //                 this.headerData[2].sorted = false
-    //                 this.headerData[3].sorted = false
-                    
-    //                 this.drawTable()
-
-    //                 this.headerData[0].ascending = true
-    //                 this.headerData[1].ascending = false
-    //                 this.headerData[2].ascending = false
-    //                 this.headerData[3].ascending = false
-
-    //             }
-
-    //             else{
-    //                 sort_data.sort((a,b) => {
-    //                     return a.phrase > b.phrase ? -1 : 1
-    //                 });
-                    
-    //                 this.table.selectAll('g').remove()
-
-    //                 let rows = this.table.selectAll('td')
-    //                 let svg_rows = rows.selectAll('svg')
-    //                 let cur_row_g = svg_rows.selectAll('g')
-    //                 cur_row_g.remove()
-
-    //                 this.headerData[0].sorted = true
-    //                 this.headerData[1].sorted = false
-    //                 this.headerData[2].sorted = false
-    //                 this.headerData[3].sorted = false
-
-    //                 this.drawTable()
-
-    //                 this.headerData[0].ascending = false 
-    //                 this.headerData[1].ascending = false
-    //                 this.headerData[2].ascending = false
-    //                 this.headerData[3].ascending = false
-    //             }
-    //         }
-
-    //         //************************* 
-    //         //SORT total
-    //         //*************************
-
-    //         else if (d.path[0].innerText.includes("Total")){
-                
-    //             if (!this.headerData[3].ascending){
-                
-    //                 sort_data.sort((a,b) => {
-    //                     return Number(a.total) < Number(b.total) ? -1 : 1
-    //                 });
-                    
-    //                 this.table.selectAll('g').remove()
-
-    //                 let rows = this.table.selectAll('td')
-    //                 let svg_rows = rows.selectAll('svg')
-    //                 let cur_row_g = svg_rows.selectAll('g')
-    //                 cur_row_g.remove()
-
-    //                 this.headerData[0].sorted = false
-    //                 this.headerData[1].sorted = false
-    //                 this.headerData[2].sorted = false
-    //                 this.headerData[3].sorted = true
-                    
-    //                 this.drawTable()
-
-    //                 this.headerData[0].ascending = false
-    //                 this.headerData[1].ascending = false
-    //                 this.headerData[2].ascending = false
-    //                 this.headerData[3].ascending = true
-
-    //             }
-
-    //             else{
-    //                 sort_data.sort((a,b) => {
-    //                     return Number(a.total) > Number(b.total) ? -1 : 1
-    //                 });
-                    
-    //                 this.table.selectAll('g').remove()
-
-    //                 let rows = this.table.selectAll('td')
-    //                 let svg_rows = rows.selectAll('svg')
-    //                 let cur_row_g = svg_rows.selectAll('g')
-    //                 cur_row_g.remove()
-
-    //                 this.headerData[0].sorted = false
-    //                 this.headerData[1].sorted = false
-    //                 this.headerData[2].sorted = false
-    //                 this.headerData[3].sorted = true
-
-    //                 this.drawTable()
-
-    //                 this.headerData[0].ascending = false
-    //                 this.headerData[1].ascending = false
-    //                 this.headerData[2].ascending = false
-    //                 this.headerData[3].ascending = false
-    //             }
-    //         }
-
-    //         //************************* 
-    //         //SORT FREQUENCY
-    //         //*************************
-
-    //         else if (d.path[0].innerText.includes("Frequency")){
-                
-    //             if (!this.headerData[1].ascending){
-                
-    //                 sort_data.sort((a,b) => {
-    //                     return Number(a.total) < Number(b.total) ? -1 : 1
-    //                 });
-                    
-    //                 this.table.selectAll('g').remove()
-
-    //                 let rows = this.table.selectAll('td')
-    //                 let svg_rows = rows.selectAll('svg')
-    //                 let cur_row_g = svg_rows.selectAll('g')
-    //                 cur_row_g.remove()
-
-    //                 this.headerData[0].sorted = false
-    //                 this.headerData[1].sorted = true
-    //                 this.headerData[2].sorted = false
-    //                 this.headerData[3].sorted = false
-                    
-    //                 this.drawTable()
-
-    //                 this.headerData[0].ascending = false
-    //                 this.headerData[1].ascending = true
-    //                 this.headerData[2].ascending = false
-    //                 this.headerData[3].ascending = false
-
-    //             }
-
-    //             else{
-    //                 sort_data.sort((a,b) => {
-    //                     return Number(a.total) > Number(b.total) ? -1 : 1
-    //                 });
-                    
-    //                 this.table.selectAll('g').remove()
-
-    //                 let rows = this.table.selectAll('td')
-    //                 let svg_rows = rows.selectAll('svg')
-    //                 let cur_row_g = svg_rows.selectAll('g')
-    //                 cur_row_g.remove()
-
-    //                 this.headerData[0].sorted = false
-    //                 this.headerData[1].sorted = true
-    //                 this.headerData[2].sorted = false
-    //                 this.headerData[3].sorted = false
-
-    //                 this.drawTable()
-
-    //                 this.headerData[0].ascending = false
-    //                 this.headerData[1].ascending = false
-    //                 this.headerData[2].ascending = false
-    //                 this.headerData[3].ascending = false
-    //             }
-    //         }
-
-
-    //         //************************* 
-    //         //SORT PERCENTAGES
-    //         //*************************
-
-    //         else if (d.path[0].innerText.includes("Percentages")){
-                
-    //             if (!this.headerData[2].ascending){
-                
-    //                 sort_data.sort((a,b) => {
-    //                     return Number(a.percent_of_d_speeches) >  Number(b.percent_of_r_speeches) ? -1 : 1
-
-    //                 });
-                    
-    //                 this.table.selectAll('g').remove()
-
-    //                 let rows = this.table.selectAll('td')
-    //                 let svg_rows = rows.selectAll('svg')
-    //                 let cur_row_g = svg_rows.selectAll('g')
-    //                 cur_row_g.remove()
-
-    //                 this.headerData[0].sorted = false
-    //                 this.headerData[1].sorted = false
-    //                 this.headerData[2].sorted = true
-    //                 this.headerData[3].sorted = false
-                    
-    //                 this.drawTable()
-
-    //                 this.headerData[0].ascending = false
-    //                 this.headerData[1].ascending = false
-    //                 this.headerData[2].ascending = true
-    //                 this.headerData[3].ascending = false
-
-    //             }
-
-    //             else{
-    //                 sort_data.sort((a,b) => {
-    //                     return Number(a.percent_of_d_speeches) < Number(b.percent_of_r_speeches) ? -1 : 1
-    //                 });
-                    
-    //                 this.table.selectAll('g').remove()
-
-    //                 let rows = this.table.selectAll('td')
-    //                 let svg_rows = rows.selectAll('svg')
-    //                 let cur_row_g = svg_rows.selectAll('g')
-    //                 cur_row_g.remove()
-
-    //                 this.headerData[0].sorted = false
-    //                 this.headerData[1].sorted = false
-    //                 this.headerData[2].sorted = true
-    //                 this.headerData[3].sorted = false
-
-    //                 this.drawTable()
-
-    //                 this.headerData[0].ascending = false
-    //                 this.headerData[1].ascending = false
-    //                 this.headerData[2].ascending = false
-    //                 this.headerData[3].ascending = false
-    //             }
-    //         }
-
-
-    //     })
-    // }
-
-
-
    
 }
