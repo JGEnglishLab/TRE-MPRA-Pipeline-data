@@ -1,15 +1,12 @@
 class Volcano{
-    constructor(volcano_data, globalApplicationState){
+    constructor(all_data, globalApplicationState){
 
         //**********************************************************************************************
         //                                  CONSTANTS FOR CHART SIZE
         //**********************************************************************************************
-        this.WIDTH = 500
+        this.WIDTH = 650 //500
         this.HEIGHT = 800
-        this.MARGIN_BOTTOM = 25
-        this.MARGIN_LEFT = 25
-        this.MARGIN_RIGHT = 25
-        this.MARGIN_TOP = 25
+        this.MARGIN = 55
         this.DEFAULT_VOLCANO_OPACITY = .7
         this.DEFAULT_STROKE_WIDTH = .2
         this.ANIMATION_DURATION = 8
@@ -19,49 +16,70 @@ class Volcano{
         this.NOT_HIGHLIGHTED_STROKE_WIDTH = .01
         this.HIGHLIGHTED_STROKE_WIDTH = 1
 
+        this.TOP_5_OPACITY = 1
+        this.CONTROL_OPACITY = .5
+        this.ALL_OTHER_OPACITY=.5
+        this.BRUSH_ON_OPACITY=1
+        this.BRUSH_OFF_OPACITY=.1
+        this.TOP_5_RADIUS = 4
+        this.ALL_OTHER_RADIUS = 2.5
+
+        this.FDR_LINE_COLOR = "#e83f3f"
+        this.CIRCLE_COLOR = "grey"
+        this.CONTROL_CIRCLE_COLOR = "#4c4c4c"
+
+        const that = this
 
         //**********************************************************************************************
         //                                  GENERAL SET UP 
         //**********************************************************************************************
-
+        this.all_data = all_data
         this.globalApplicationState = globalApplicationState
-        this.volcano_data = volcano_data
 
         this.volcano_div = d3.select("#volcano-div") 
-
+    
         this.volcanoSvg = this.volcano_div.append("svg")
         .attr('id', 'volcano_svg')
-        .attr('width', this.WIDTH)
+        .attr('width', this.WIDTH + 75)
         .attr('height', this.HEIGHT)
        
 
-        // this.groupedData = d3.groups(data[0], (d) => d.category)
-        // this.keys = this.groupedData.map((d,i) => {
-        //     return {category: d[0], position: i}})
-
-        // this.bubbleSvg = this.bubble_div.append("svg")
-        //     .attr('id', 'bubble_svg')
-        //     .attr('width', this.TOTAL_WIDTH)
-        //     .attr('height', this.TOTAL_HEIGHT)
-
-        // this.brushSvg = this.bubbleSvg.append("svg")
-        //     .attr('id', 'brush_svg')
-        //     .attr('height', this.TOTAL_HEIGHT)
-        //     .attr('width', this.TOTAL_WIDTH)
-        //     .style('position', 'absolute')
-
-          
-
-     
         //**********************************************************************************************
         //                                  GET MIN AND MAX
         //**********************************************************************************************
 
-        //min max for source x and y
-        this.max_p_val = d3.max(this.volcano_data.map(d => d.neg_log10_pval))
+        this.max_p_val = 15
+        this.max_fc = 2
+        this.min_fc = -2
 
-        this.max_fc = d3.max(this.volcano_data.map(d => d.logFC))
-        this.min_fc = d3.min(this.volcano_data.map(d => d.logFC))
+        //**********************************************************************************************
+        //                                   LABELS
+        //**********************************************************************************************
+
+        this.volcanoSvg.append("text").attr("x",640).attr("y",700).text("FDR = .05").style("font-size", "15px").attr("alignment-baseline","middle")
+        this.volcanoSvg
+            .append('line')
+            .style("stroke", this.FDR_LINE_COLOR)
+            .style("stroke-width", 4)
+            .attr("x1", 615)
+            .attr("y1",700)
+            .attr("x2", 635)
+            .attr("y2", 700); 
+
+        this.volcanoSvg
+        .append("text")
+        .attr("transform","translate(" + this.WIDTH / 2 + " ," + (this.HEIGHT - 10) + ")")
+        .style("text-anchor", "middle")
+        .text("Log 2 Fold Change");
+
+        this.volcanoSvg
+        .append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 15)
+        .attr("x",-(this.HEIGHT/2))
+        .style("text-anchor", "middle")
+        .text("LRT Statistic");
+
 
         //**********************************************************************************************
         //                                  SCALES
@@ -70,279 +88,279 @@ class Volcano{
         //TODO should we make the x scale symetrical?
         this.x_scale = d3.scaleLinear()
         .domain([this.min_fc, this.max_fc]).nice()
-        .range([this.MARGIN_LEFT, this.WIDTH - this.MARGIN_RIGHT])
+        .range([this.MARGIN, this.WIDTH - this.MARGIN])
 
         this.y_scale = d3.scaleLinear()
         .domain([0, this.max_p_val]).nice()
-        .range([this.HEIGHT - this.MARGIN_BOTTOM, this.MARGIN_TOP])
+        .range([this.HEIGHT - this.MARGIN, this.MARGIN])
 
         this.xAxis = g => g
-        .attr("transform", `translate(0,${this.HEIGHT - this.MARGIN_BOTTOM })`)
+        .attr("transform", `translate(0,${this.HEIGHT - this.MARGIN })`)
         .call(d3.axisBottom(this.x_scale))
 
         this.yAxis = g => g
-        .attr("transform", `translate(${this.MARGIN_LEFT},0)`)
+        .attr("transform", `translate(${this.MARGIN},0)`)
         .call(d3.axisLeft(this.y_scale))
 
 
         this.x_axis = this.volcanoSvg.append('g').call(this.xAxis)
         this.y_axis = this.volcanoSvg.append('g').call(this.yAxis)
+        this.line = this.volcanoSvg.append('g')
         this.points = this.volcanoSvg.append('g')
 
 
-        this.scaleColor = d3.scaleOrdinal() 
-        .domain(["Other Architectures", "Negative Control", "Highest Responding Architecture", "10","09","08","07","06","05","04","03","02","01"])
-        .range(["#E4E4E4", //other
-        "#919090" , //neg
-        "#92FEF8",  //highest
-        "#3cb44b",  //10
-        "#808000",  //9
-        "#800000",  //8
-        "#9A6324",  //7
-        "#bfef45",  //6
-        "#911eb4",  //5
-        "#f58231",  //4
-        "#4363d8",  //3
-        "#ffe119",  //2
-        "#e6194B"]);    //1
-        
 
 
-        //**********************************************************************************************
-        //                                      TEXT
-        //**********************************************************************************************
+        document.getElementById('control_check').addEventListener('change', function(){
+            const isChecked = d3.select(this).property("checked");
+            if (isChecked) {
+                d3.select("#top_check").property('checked', false)
+                that.drawVolcano()
+                that.points.selectAll("circle")
+                    .style("opacity", d => (d.controls === "True" ? 1 : 0))
+                    .filter(d => d.controls !== "True")
+                    .remove();
+            } 
+            else {
+                that.drawVolcano()
+            }
+          });
 
-        
-        // let text = this.bubbleSvg
-        //     .append('g')
-        //     .attr('id', "text_g")
-        
-        // text.append("text")
-        //     .attr("text-anchor", "middle")
-        //     .attr("transform",
-        //     "translate(0," + this.LABELS_MARGIN + ")")
-        //     .attr("x", 75)
-        //     .attr('y', 10)
-        //     .text("Democratic Leaning")
-        //     .style("font", "16px sans-serif")
-        //     .style("font-weight", "bold")
-        //     .attr('fill', "steelblue")
-
-        // text.append("text")
-        //     .attr("text-anchor", "middle")
-        //     .attr("transform",
-        //     "translate(0," + this.LABELS_MARGIN + ")")
-        //     .attr("x", this.TOTAL_WIDTH - 85)
-        //     .attr('y', 10)
-        //     .text("Republican Leaning")
-        //     .style("font", "16px sans-serif")
-        //     .style("font-weight", "bold")
-        //     .attr('fill', "firebrick")
-
-        // //**********************************************************************************************
-        // //                                      LEGEND
-        // //**********************************************************************************************
-
-        
-        // let legend = this.bubbleSvg
-        //     .append('g')
-        //     .attr('id', "legend_g")
-        //     .attr("transform",
-        //     "translate(0," + this.LEGEND_MARGIN+ ")")
-
-        // let legend_data = ['50', '40', '30', '20', '10','0', '10', '20', '30', '40','50']
-        // let xAxisGenerator = d3.axisBottom(this.scale_percent);
-
-        // xAxisGenerator.ticks(11);
-        // xAxisGenerator.tickValues([-50, -40, -30, -20, -10,0, 10, 20, 30, 40,50])
-
-        // let xAxis =  d3.select('#legend_g')
-        //       .call(xAxisGenerator)
-        //       .selectAll("text")
-        //       .data(legend_data)
-        //       .text((d)=>d)
-        //       .attr("color", (d,i)=> {
-        //         if (i <= 4){
-        //             return('steelblue')
-        //         }
-        //         else if (i === 5){
-        //             return('grey')
-        //         }
-        //         return('firebrick')
-        //       })
-           
-        //     xAxis
-        //     .data(legend_data)
-        //     .text((d)=>d)
-        //     .style("font", "16px sans-serif")
-
-        //     d3.select('.domain').remove()
-
-        // //**********************************************************************************************
-        // //                                      DRAW BUBBLES FOR FIRST TIME
-        // //**********************************************************************************************
-
-        // var tooltip = d3.select("#bubble_div")
-        //     .append("div")
-        //     .style("opacity", 0)
-        //     .style('position', 'absolute')
-        //     .attr("id", 'tool_tip_div')
-        //     .attr("class", "tooltip")
-        //     .style("background-color", "black")
-        //     .style("border-radius", "5px")
-        //     // .style("padding", "10px")
-        //     .style("color", "white")
-
-        //     // var div = d3.select("body").append("div")	
-        //     // .attr("class", "tooltip")				
-        //     // .style("opacity", 0);
-            
-        // this.single_g = this.bubbleSvg
-        // // this.single_g = tooltip
-        //     .append('g')
-        //     .attr("id", 'single_g')
-        //     .attr("transform",
-        //     "translate(0," + this.BUBBLE_MARGIN + ")")
-
-        // this.single_g.append("line")
-        //     .attr("y1", this.CENTER_LINE_TOP)
-        //     .attr("y2", this.max_y + this.CENTER_LINE_BOTTOM )
-        //     .attr("x1", this.scale_percent(0))
-        //     .attr("x2", this.scale_percent(0))
-        //     .attr( "stroke", "grey" )
-        //     .attr( "stroke-width", "2" )
-        //     .attr( "stroke-opacity", '.5')
-
-        
-        // //**********************************************************************************************
-        // //                                     TOOL TIP
-        // //**********************************************************************************************
+          document.getElementById('number_selector').addEventListener('change', function(){
+            let n = d3.select('#number_selector').property("value") === "" ? 5 : d3.select('#number_selector').property("value")
+            const isChecked = d3.select("#top_check").property("checked");
+            if (isChecked) {
+                d3.select("#control_check").property('checked', false)
+                that.drawVolcano()
+                that.points.selectAll("circle")
+                    // .style("opacity", d => (+d[that.max_rank_name] <= 5) )
+                    .filter(d => +d[that.max_rank_name] > n | d[that.max_rank_name] == "")
+                    .remove();
+            } 
+            else {
+                that.drawVolcano()
+            }
+          });
 
 
-        // const that = this
-        // this.single_g
-        //     .selectAll('circle')
-        //     .data(this.data)
-        //     .join('circle')
-        //     .attr("cx", (d) => d.sourceX)
-        //     .attr('cy', (d) => d.sourceY)
-        //     .style("stroke", "black")
-        //     .style("fill", (d) => this.scaleColor(d.category))
-        //     .attr("r", (d) => this.scaleCircle(d.total))
-        //     .on("mouseover", function(event, d) { 
-               
+          document.getElementById('top_check').addEventListener('change', function(){
+            const isChecked = d3.select(this).property("checked");
 
-        //         tooltip
-        //         .transition()
-        //         .duration(200)
+            let n = d3.select('#number_selector').property("value") === "" ? 5 : d3.select('#number_selector').property("value")
 
-        //         tooltip
-        //         .style("opacity", 1)
-        //         .html("Phrase: " +d.phrase + " <br>Percent of speeches: " + (d.total / 50))
-        //         .style("left", (event.pageX + 30+ "px"))
-        //         .style("top", ((event.pageY - 30) + "px"))
-        //     })
-        //     .on("mousemove", function(event, d) {
-        //         tooltip
-        //         .style("left", (event.pageX + 30 + "px"))
-        //         .style("top", ((event.pageY - 30) + "px"))
-        //      })
-        //     .on("mouseleave", function(event, d) {
-        //         tooltip
-        //         .transition()
-        //         .duration(200)
-        //         .style("opacity", 0)
-        //     })
+            if (isChecked) {
+                d3.select("#control_check").property('checked', false)
+                that.drawVolcano()
+                that.points.selectAll("circle")
+                    .filter(d => +d[that.max_rank_name] > n | d[that.max_rank_name] == "")
+                    .remove();
+            } 
+            else {
+                that.drawVolcano()
+            }
+          });
 
+      
 
-
-
-        // //**********************************************************************************************
-        // //                                     BRUSH
-        // //**********************************************************************************************
-
-        
-
-        // this.brushSvg.selectAll('g')
-        // .data(this.keys)
-        // .join('g')
-        // .attr('transform', (d,i) => 'translate(0,' + (this.BUBBLE_START + ((i) * this.GROUPED_WIDTH)) + ')')
-        // .attr('class', 'oned-brushes')
-        // .append('rect')
-        // .attr('height', this.GROUPED_WIDTH)
-        // .attr('width', this.TOTAL_WIDTH)
-        // .attr('fill', 'none')
-        // .attr('stroke', 'none')
-
-        // this.brushGroups = this.brushSvg.selectAll('g')
-        // this.updateBrush()
+      
        
     }
 
-    drawVolcano(){
+    drawVolcano(selected_motif = ""){
+        const that = this
+        if (this.globalApplicationState.selected_comparison != "none"){
 
-        if (this.globalApplicationState.base != null && this.globalApplicationState.stimulated != null){
-
-            let filtered_volcano = this.volcano_data.filter(d => d.basal == this.globalApplicationState.base && 
-                d.stimulated == this.globalApplicationState.stimulated &&
-                d.logFC != null &&
-                d.neg_log10_pval != null)
-            
-            
-
-
-
-            //Do we want to re draw the scales each time we render? If so un comment this and work with it
-            // //TODO more efficient way to do this?
-            // let max_p = d3.max(joined_data.map(d => d.neg_log10_pval))
-            // let max_fc = d3.max(joined_data.map(d => d.logFC))
-            // let min_fc = d3.min(joined_data.map(d => d.logFC))
-            // this.x_scale = d3.scaleLinear()
-            // .domain([this.min_fc, this.max_fc]).nice()
-            // .range([this.MARGIN_LEFT, this.WIDTH - this.MARGIN_RIGHT])
-            // this.y_scale = d3.scaleLinear()
-            // .domain([0, this.max_p_val]).nice()
-            // .range([this.HEIGHT - this.MARGIN_BOTTOM, this.MARGIN_TOP])
-            // this.xAxis = g => g
-            // .attr("transform", `translate(0,${this.HEIGHT - this.MARGIN_BOTTOM })`)
-            // .call(d3.axisBottom(this.x_scale))
-            // this.yAxis = g => g
-            // .attr("transform", `translate(${this.MARGIN_LEFT},0)`)
-            // .call(d3.axisLeft(this.y_scale))
-            // this.x_axis = this.volcanoSvg.append('g').call(this.xAxis)
-            // this.y_axis = this.volcanoSvg.append('g').call(this.yAxis)
-            // this.points = this.volcanoSvg.append('g')
-            // this.x_scale = d3.scaleLinear()
-            // .domain([this.min, max]).nice()
-            // .range([this.MARGIN_LEFT, this.WIDTH - this.MARGIN_RIGHT])
-            // this.y_scale = d3.scaleLinear()
-            // .domain([this.min, max]).nice()
-            // .range([this.HEIGHT - this.MARGIN_BOTTOM, this.MARGIN_TOP])
-            // this.x_axis.selectAll('g').remove()
-            // this.y_axis.selectAll('g').remove()
-            // this.x_axis = this.alphaSvg.append('g').call(this.xAxis)
-            // this.y_axis = this.alphaSvg.append('g').call(this.yAxis)
-
-  
             this.points
                 .selectAll('circle')
-                .data(filtered_volcano)
+                .remove()
+
+            this.line
+                .selectAll('line')
+                .remove()
+
+            let stim_name = "alpha__"+stim_treatment+"__"+stim_run
+            let base_name = "alpha__"+base_treatment+"__"+base_run
+            let logFC_col = "logFC__"+this.globalApplicationState.selected_comparison
+            let statistic_name = "statistic__"+this.globalApplicationState.selected_comparison
+            this.max_rank_name = "maxRank__" +this.globalApplicationState.selected_comparison
+            let fdr_name = "fdr__" +this.globalApplicationState.selected_comparison
+
+            let selected_data = this.all_data.filter(function(d){return d[statistic_name]!= "";})
+            selected_data = selected_data.filter(function(d){return d[logFC_col] != "";})
+            //filter the same way we filter alpha so all points are in each
+            selected_data = selected_data.filter(function(d){return d[that.max_rank_name] != "";})
+            selected_data = selected_data.filter(function(d){return d[base_name]!= "";})
+            selected_data = selected_data.filter(function(d){return d[stim_name] != "";})
+
+            let test = selected_data.map(d => +d[fdr_name] - .05)
+            let below = d3.max(test.filter(function(d){return d<0}))
+            let above = d3.min(test.filter(function(d){return d>0}))
+            let match = test.filter(function(d){return d===0})
+            let fdr_threshold = null
+
+            if (match.length != 0){
+                let exact_match = selected_data.filter(function(d){
+                    return +d[fdr_name] - .05 === 0;
+                })
+                fdr_threshold = d3.mean(exact_match.map(d => d[statistic_name] ))
+            }
+            else{
+                let above_and_below = selected_data.filter(function(d){
+                    return +d[fdr_name] - .05 === above || +d[fdr_name] - .05 === below;
+                })
+                fdr_threshold = d3.mean(above_and_below.map(d => d[statistic_name] ))
+
+            }
+
+
+
+   
+            let log_fold_changes = selected_data.map(d => d[logFC_col]).filter((a) =>  a != "")
+            let max_fc = d3.max(log_fold_changes.map(d=> Number(d)))
+            let min_fc = d3.min(log_fold_changes.map(d=> Number(d)))
+            this.max_abs_fc = d3.max([max_fc, -1*min_fc])
+
+
+            let max_pval = d3.max(selected_data.map(d => +d[statistic_name]))
+            let min_pval = d3.min(selected_data.map(d => +d[statistic_name]))
+
+
+
+            console.log("max_pval", max_pval)
+            console.log("min_pval", min_pval)
+            console.log("-(.8*max_pval)", -(.8*max_pval))
+
+            if (min_pval >= 0){
+                min_pval = 0
+            }
+            else{ //Get the lower quartile
+                min_pval = d3.max([-(.2*max_pval), min_pval])
+            }
+
+
+
+
+            
+
+            
+
+
+            //Cut off anything that will dip below the min pval
+            selected_data = this.all_data.filter(function(d){return d[statistic_name]>=min_pval;})
+
+            if (selected_motif != ""){
+                selected_data = selected_data.filter(function(d){return d.motif == selected_motif})
+            }
+
+            
+            this.x_scale = d3.scaleLinear()
+            .domain([-1*this.max_abs_fc, this.max_abs_fc])
+            .range([this.MARGIN, this.WIDTH - this.MARGIN])
+
+            this.y_scale = d3.scaleLinear()
+            .domain([min_pval, max_pval])
+            .range([this.HEIGHT - this.MARGIN, this.MARGIN])
+
+            this.x_axis.selectAll('g').remove()
+            this.y_axis.selectAll('g').remove()
+
+            this.x_axis = this.volcanoSvg.append('g').call(this.xAxis)
+            this.y_axis = this.volcanoSvg.append('g').call(this.yAxis)
+
+
+            this.line
+            .append('line')
+            .style("stroke", this.FDR_LINE_COLOR)
+            .style("stroke-width", 2)
+            .attr("x1", this.x_scale(-1*this.max_abs_fc))
+            .attr("y1", this.y_scale(fdr_threshold))
+            .attr("x2", this.x_scale(this.max_abs_fc))
+            .attr("y2", this.y_scale(fdr_threshold)); 
+
+            this.points
+                .selectAll('circle')
+                .data(selected_data)
                 .enter()
                 .append('circle')
-                .attr('cx', (d)=> this.x_scale(d.logFC))
-                .attr('cy', (d)=> this.y_scale(d.neg_log10_pval))
-                .attr('r', (d) =>{
-                    if (d.s == 'small'){
-                        return(2)
+                .attr('cx', (d)=> this.x_scale(d[logFC_col]))
+                .attr('cy', (d)=> this.y_scale(d[statistic_name]))
+           
+
+                .style('fill', (d)=>{
+                    if (selected_motif==""){
+                        if(+d[this.max_rank_name] <= 5 & d[this.max_rank_name]!= ""){
+                            return that.globalApplicationState.scaleColor(+d[this.max_rank_name])
+                        }
+                        else if (d["controls"] === "True"){
+                            return this.CONTROL_CIRCLE_COLOR
+                        }
+                        else{
+                            return this.CIRCLE_COLOR
+                        }
                     }
                     else{
-                        return(4)
+                        if(+d[this.max_rank_name] <= 5 & d[this.max_rank_name]!= ""){
+                            return that.globalApplicationState.scaleColor(+d[this.max_rank_name])
+                        }
+                        return "black"
                     }
                 })
-                .style('fill', d => this.scaleColor(d.type))
+              
+                .attr('r', (d) =>{
+                    if (selected_motif==""){
+                        if (+d[this.max_rank_name] <= 5 & d[this.max_rank_name]!= ""){
+                            return(this.TOP_5_RADIUS )
+                        }
+                        else{
+                            return( this.ALL_OTHER_RADIUS )
+                        }
+                    }
+                    else{
+                        return(this.TOP_5_RADIUS)
+                    }
+                })
                 .style('stroke', 'black')
                 .style('stroke-width', this.DEFAULT_STROKE_WIDTH)
-                .style('opacity', this.DEFAULT_VOLCANO_OPACITY )
+            
+
+                .style('opacity', (d)=>{
+                    if (selected_motif==""){
+                        if(+d[this.max_rank_name] <= 5 & d[this.max_rank_name]!= ""){
+                            return 1
+                        }
+                        else if (d["controls"] === "True"){
+                            return .1
+                        }
+                        else{
+                            return .5
+                        }
+                    }
+                    else{
+                        return that.TOP_5_OPACITY
+                    }
+                })
+                .on("mouseover", (event, d) => {
+                    d3.select(".tooltip")
+                      .style("opacity", 1)
+                      .html("Architecture Name: " + d.architecture)
+                      .style("left", `${event.pageX + 30}px`)
+                      .style("top", `${event.pageY - 10}px`)
+                  })
+                  .on("mousemove", (event, d) => {
+                    d3.select(".tooltip")
+                      .style("left", `${event.pageX + 30}px`)
+                      .style("top", `${event.pageY - 10}px`)
+                  })
+                  .on("mouseleave", (event, d) => {
+                    d3.select(".tooltip").style("opacity", 0)
+                    .style("left", "-30px")
+                    .style("top", "-30px")
+                  })
+                  .on("click", (event, d) => {
+                    that.info.click(d)
+                  })
+
+       
 
         }
 
@@ -350,238 +368,24 @@ class Volcano{
             this.points
                 .selectAll('circle')
                 .remove()
+
+            this.line
+                .selectAll('line')
+                .remove()
         }
 
 
-    }
-
-    brushVolcano(brushed_data, brushing){
-        if (brushing){
-            this.points
-            .selectAll("circle")
-            .style("opacity", d => {
-                if(brushed_data.includes(d.architecture)){
-                    return(this.HIGHLIGHTED_OPACITY)
-                }
-                else{
-                    return(this.NOT_HIGHLIGHTED_OPACITY)
-                }
-            })
-            .style("stroke-width", d => {
-                if(brushed_data.includes(d.architecture)){
-                    return(this.HIGHLIGHTED_STROKE_WIDTH)
-                }
-                else{
-                    return(this.NOT_HIGHLIGHTED_STROKE_WIDTH)
-                }
-            })
-            .transition(this.ANIMATION_DURATION)
-        }
-        else{
-            this.points
-            .selectAll('circle')
-            .style('opacity', this.DEFAULT_VOLCANO_OPACITY )
-            .style('stroke-width', this.DEFAULT_STROKE_WIDTH )
-            .transition(this.ANIMATION_DURATION)
-
-
-        }
-
-    }
-
-    yHighAndLow(y){
-        for (let i = 0; i < this.keys.length + 1; i ++){
-            if ((y > (this.BUBBLE_START + ((i) * this.GROUPED_WIDTH))) &&  (y < (this.BUBBLE_START + ((i+1) * this.GROUPED_WIDTH)))){
-                return [(this.BUBBLE_START + ((i) * this.GROUPED_WIDTH)), (this.BUBBLE_START + ((i+ 1) * this.GROUPED_WIDTH))]
-            }
-        }
     }
 
    
+    set_info(info){
+        this.info = info
+    }
 
-
-    
-    updateBrush(){
-        
-
-        let activeBrush = null;
-        let activeBrushNode = null;
-
-   
-
-
-        const that = this 
-
-        // We loop through the g elements, and attach brush for each g
-        this.brushGroups.each(function(){
-           
-
-            //d3.brush.remover() on button
-            //look at observable, see if there is a way to remove 
-            const selection = d3.select(this);
-            const brush = d3.brushX()
-            .extent([[0,0], [that.TOTAL_WIDTH, that.GROUPED_WIDTH]])
-            .on('start brush end', function (s) {
-
-                let phrases = []
-
-                that.single_g
-                .selectAll('circle')
-                .style("fill", "grey")
-
-                // if there is an active brush, and that is not on the current g
-                if (activeBrush && selection !== activeBrushNode) {
-                // we remove that brush on the other g element
-                activeBrushNode.call(activeBrush.move, null);
-                }
-                activeBrush = brush;
-                activeBrushNode = selection;
-
-                if(s.selection != null){
-
-                    let xlow = s.selection[0];
-                    let xhigh = s.selection[1];
-                    let y = s.sourceEvent.pageY
-                    let ylow = that.yHighAndLow(y)[0]
-                    let yhigh = that.yHighAndLow(y)[1]
-
-
-                    if (that.grouped){
-                        that.single_g
-                        .selectAll('circle')
-                        .style("fill", (d) => {
-                            if (d.moveX > xlow && d.moveX < xhigh && (d.moveY + that.BUBBLE_MARGIN + that.GROUPED_WIDTH ) > ylow && (d.moveY + that.BUBBLE_MARGIN + that.GROUPED_WIDTH  )< yhigh){
-
-                                let filtered_data = that.data.filter(d => d.moveX > xlow&& d.moveX < xhigh  && (d.moveY + that.BUBBLE_MARGIN + that.GROUPED_WIDTH ) > ylow && (d.moveY + that.BUBBLE_MARGIN + that.GROUPED_WIDTH  )< yhigh)
-                                that.globalApplicationState.brushed_data = filtered_data
-                                that.globalApplicationState.brushed = true
-                                that.table.drawTable()
-                                return(that.scaleColor(d.category))
-                            }
-                            else{
-                                return('grey')
-                            }
-                        })
-
-                        
-
-
-                    }
-                    else{
-                        that.single_g
-                        .selectAll('circle')
-                        .style("fill", (d) => {
-                            if (d.sourceX > xlow && d.sourceX < xhigh  ){
-                                let filtered_data = that.data.filter(d => d.moveX > xlow&& d.moveX < xhigh )
-                                that.globalApplicationState.brushed_data = filtered_data
-                                that.globalApplicationState.brushed = true
-                                that.table.drawTable()
-                                return(that.scaleColor(d.category))
-                            }
-                            else{
-                                return('grey')
-                            }
-                        })
-
-                    }
-
-                }
-
-                else{
-
-                that.globalApplicationState.brushed_data = []
-                that.globalApplicationState.brushed = false
-                that.table.drawTable()
-                that.table.attachSortHandlers()
-                that.single_g
-                .selectAll('circle')
-                .style("fill", (d) => that.scaleColor(d.category))
-
-                }
-            })
-
-           
-            selection.call(brush);
-            return selection;
-        })
-
+    set_alpha(alpha){
+        this.alpha = alpha
     }
 
  
-    //**********************************************************************************************
-    //**********************************************************************************************
-    //                                      SHIFT BUBBLES
-    //**********************************************************************************************
-    //**********************************************************************************************
-
-
-    shiftBubbles(grouped){
-        if (grouped){
-            
-         
-
-            this.grouped = true
-
-            this.single_g.selectAll("line")
-            .transition(this.ANIMATION_DURATION)
-            .attr("y2", this.max_move_y + this.CENTER_LINE_BOTTOM)
-
-            this.single_g.selectAll("circle")  
-            .transition(this.ANIMATION_DURATION)
-            .attr("cx", (d) => d.moveX)
-            .attr("cy", (d) => d.moveY)
-
-            this.single_g.selectAll('text')
-            .data(this.keys)
-            .join('text')
-            .transition(this.ANIMATION_DURATION)
-            .attr("x", 0)
-            .attr('y', (d,i) => -50 + this.GROUPED_WIDTH * i)
-            .attr("fill", (d) => {
-                return this.scaleColor(d.category)})
-            .text((d) =>  d.category)
-            .style("font", "18px sans-serif")
-            .attr('stroke', 'black')
-            .attr( "stroke-width", ".35" )
-
-            
-
-            this.updateBrush()
-
-
-        }
-        else{
-          
-
-            this.grouped = false
-
-
-
-
-            this.single_g.selectAll("line")
-            .transition(this.ANIMATION_DURATION)
-            .attr("y2", this.max_y  + this.CENTER_LINE_BOTTOM)
-
-            this.single_g.selectAll("circle")  
-            .transition(this.ANIMATION_DURATION)
-            .attr("cx", (d) => d.sourceX)
-            .attr("cy", (d) => d.sourceY)
-
-            this.single_g.selectAll('text')
-            .transition(this.ANIMATION_DURATION)
-            .attr('y', -50)
-            .attr('fill', 'white')
-            .attr('stroke', 'white')
-            .remove()
-
-            this.activeBrush = null;
-            this.activeBrushNode = null;
-
-            this.updateBrush()
-
-            
-            
-
-        }        
-    }
+   
 }
